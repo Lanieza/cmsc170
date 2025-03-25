@@ -25,27 +25,38 @@
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        let player = { x: 200, y: 200, radius: 16 };
-        let light = { x: 100, y: 100, size: 100 };
-        let detected = false;
+        let player, light, detected, gameOver;
         const speed = 5;
         let lightSpeed = 2;
         let angle = 0;
         let stopLight = false;
-
         let keys = {};
-        
-        document.addEventListener("keydown", (e) => keys[e.key] = true);
+
+        function resetGame() {
+            player = { x: 200, y: 200, radius: 16 };
+            light = { x: 100, y: 100, size: 100 };
+            detected = false;
+            gameOver = false;
+            angle = 0;
+        }
+
+        document.addEventListener("keydown", (e) => {
+            keys[e.key] = true;
+            if (e.key === "r" || e.key === "R") resetGame(); // Restart game
+        });
+
         document.addEventListener("keyup", (e) => keys[e.key] = false);
 
         function movePlayer() {
-            if (keys["ArrowUp"]) player.y -= speed;
-            if (keys["ArrowDown"]) player.y += speed;
-            if (keys["ArrowLeft"]) player.x -= speed;
-            if (keys["ArrowRight"]) player.x += speed;
+            if (gameOver) return;
+            if (keys["ArrowUp"] && player.y - player.radius > 0) player.y -= speed;
+            if (keys["ArrowDown"] && player.y + player.radius < canvas.height) player.y += speed;
+            if (keys["ArrowLeft"] && player.x - player.radius > 0) player.x -= speed;
+            if (keys["ArrowRight"] && player.x + player.radius < canvas.width) player.x += speed;
         }
 
         function moveLight() {
+            if (gameOver) return;
             let dx = player.x - light.x;
             let dy = player.y - light.y;
             let distance = Math.sqrt(dx * dx + dy * dy);
@@ -57,6 +68,8 @@
                 light.x = 300 + Math.cos(angle) * 150;
                 light.y = 200 + Math.sin(angle) * 150;
                 angle += lightSpeed * 0.01;
+            } else {
+                gameOver = true; // End game when caught
             }
         }
 
@@ -94,6 +107,15 @@
                 ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
+
+            // Show game over message
+            if (gameOver) {
+                ctx.fillStyle = "red";
+                ctx.font = "30px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2);
+                ctx.fillText("Press 'R' to Restart", canvas.width / 2, canvas.height / 2 + 40);
+            }
         }
 
         function gameLoop() {
@@ -103,6 +125,7 @@
             requestAnimationFrame(gameLoop);
         }
 
+        resetGame();
         gameLoop();
     </script>
 </body>
