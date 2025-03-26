@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Light Chase Game</title>
+    <title>Gothic Cathedral Maze</title>
     <style>
         body {
             margin: 0;
@@ -11,122 +11,612 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: black;
+            background-color: #0a0000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            image-rendering: pixelated;
         }
         canvas {
-            background-color: black;
-            border: 2px solid #444;
+            background-color: #0a0000;
+            border: 4px solid #3a0a0a;
+            box-shadow: 0 0 20px #500000;
+            image-rendering: pixelated;
+        }
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            color: #ff9090;
+            background-color: rgba(40, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            max-width: 600px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <canvas id="gameCanvas" width="320" height="240"></canvas>
     <script>
+        // Get the game canvas and its drawing context
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
+        
+        // Set up pixel scaling for a retro, pixelated look
+        const PIXEL_SIZE = 2; // Scale factor for pixel art effect
+        const GAME_WIDTH = canvas.width;
+        const GAME_HEIGHT = canvas.height;
+        
+        // Scale up the canvas display while keeping low resolution
+        canvas.style.width = `${GAME_WIDTH * PIXEL_SIZE}px`;
+        canvas.style.height = `${GAME_HEIGHT * PIXEL_SIZE}px`;
+        
+        // Disable image smoothing to preserve sharp pixelated graphics
+        ctx.imageSmoothingEnabled = false;
 
+        //  Player, light source, and game state variables
         let player, light, detected, gameOver;
-        const speed = 5;
-        let lightSpeed = 2;
-        let angle = 0;
-        let stopLight = false;
-        let keys = {};
+        const speed = 2; // Player movement speed
+        let lightSpeed = 0.5; // Speed of the light movement
+        let angle = 0; // Angle for rotating effects (if any)
+        let stopLight = false; // Determines if light movement stops
+        let keys = {}; // Stores pressed keys for movement
+        let frameCount = 0; // Counts game frames for animations
 
-        function resetGame() {
-            player = { x: 200, y: 200, radius: 16 };
-            light = { x: 100, y: 100, size: 100 };
-            detected = false;
-            gameOver = false;
-            angle = 0;
+        //  Define colors used in the game
+        const COLORS = {
+            background: "#220000", // Dark red background color
+            floor: "#3a0a0a", // Floor color
+            floorPattern: "#2a0505", // Alternative floor pattern
+            walls: "#4a1010", // Wall color
+            wallsHighlight: "#5a2020", // Wall highlights
+            player: "#ffcc00", // Player's main color
+            playerShadow: "#aa7700", // Player's shadow effect
+            light: "#ffaa77", // Light source color
+            lightGlow: "#ff5500", // Light glow effect
+            gameOverBg: "#000000", // Background color when game over
+            gameOverText: "#ff3333", // Game over text color
+            candleLight: "#ffaa55", // Candle glow color
+            stainedGlass: ["#ff0000", "#aa00aa", "#ffaa00", "#ff00aa"] // Colors for stained glass windows
+        };
+
+        
+        // Arrays to store game objects
+        let walls = [];       // Walls of the maze
+        let pillars = [];     // Pillars inside the maze
+        let candles = [];     // Candles to be collected
+        let floorTiles = [];  // Floor tile patterns
+        let stainedGlass = []; // Stained glass window decorations
+
+
+        // Function to draw UI elements like score and highest score
+        function drawUI() {
+            ctx.fillStyle = "white"; // Set text color to white
+            ctx.font = "10px Arial"; // Set font size and type
+            ctx.textAlign = "left";
+
+            // 🕯️ Show collected candles score on the top left
+            ctx.fillText("Candles Collected: " + candlesCollected, 20, 12);
+
+            // 🏆 Show highest score on the top right
+            ctx.textAlign = "right";
+            ctx.fillText("Highest Score: " + highestScore, GAME_WIDTH - 20, 12);
         }
 
+
+        function createCathedralElements() {
+            // Create outer walls (border around the screen)
+            walls = [
+                {x: 0, y: 0, width: GAME_WIDTH, height: 20}, // Top wall
+                {x: 0, y: GAME_HEIGHT - 20, width: GAME_WIDTH, height: 20}, // Bottom wall
+                {x: 0, y: 0, width: 20, height: GAME_HEIGHT}, // Left wall
+                {x: GAME_WIDTH - 20, y: 0, width: 20, height: GAME_HEIGHT} // Right wall
+            ];
+            
+            // Create maze walls
+            // Horizontal walls
+            walls.push({x: 40, y: 40, width: 80, height: 10});
+            walls.push({x: 160, y: 40, width: 120, height: 10});
+            walls.push({x: 40, y: 80, width: 40, height: 10});
+            walls.push({x: 120, y: 80, width: 80, height: 10});
+            walls.push({x: 240, y: 80, width: 40, height: 10});
+            walls.push({x: 80, y: 120, width: 80, height: 10});
+            walls.push({x: 200, y: 120, width: 80, height: 10});
+            walls.push({x: 40, y: 160, width: 120, height: 10});
+            walls.push({x: 200, y: 160, width: 40, height: 10});
+            walls.push({x: 80, y: 200, width: 160, height: 10});
+            
+            // Vertical walls
+            walls.push({x: 80, y: 40, width: 10, height: 40});
+            walls.push({x: 160, y: 56, width: 10, height: 64});
+            walls.push({x: 200, y: 40, width: 10, height: 40});
+            walls.push({x: 240, y: 96, width: 10, height: 64});
+            walls.push({x: 40, y: 96, width: 10, height: 64});
+            walls.push({x: 120, y: 96, width: 10, height: 64});
+            walls.push({x: 80, y: 136, width: 10, height: 64});
+            walls.push({x: 200, y: 136, width: 10, height: 24});
+            walls.push({x: 160, y: 160, width: 10, height: 40});
+            
+            // Create pillars at intersections
+            pillars = [
+                {x: 80, y: 80, size: 10},
+                {x: 160, y: 80, size: 10},
+                {x: 200, y: 80, size: 10},
+                {x: 240, y: 80, size: 10},
+                {x: 80, y: 120, size: 10},
+                {x: 160, y: 120, size: 10},
+                {x: 200, y: 120, size: 10},
+                {x: 80, y: 160, size: 10},
+                {x: 160, y: 160, size: 10},
+                {x: 200, y: 160, size: 10}
+            ];
+
+            // Create floor tiles
+            for (let y = 20; y < GAME_HEIGHT - 20; y += 20) {
+                for (let x = 20; x < GAME_WIDTH - 20; x += 20) {
+                    floorTiles.push({
+                        x: x,
+                        y: y,
+                        size: 20,
+                    });
+                }
+            }
+            
+            //Create stained glass window at the top
+            for (let i = 0; i < 8; i++) {
+                stainedGlass.push({
+                    x: GAME_WIDTH/2 - 40 + i*10,
+                    y: 5,
+                    size: 10,
+                    color: COLORS.stainedGlass[i % COLORS.stainedGlass.length]
+                });
+            }
+        } 
+        
+        function resetGame() {
+            // Initialize Player
+            player = { 
+                x: 30,   // Start position (left corner)
+                y: 30,  
+                size: 8,  // Player size
+                direction: 0, // 0: down, 1: left, 2: right, 3: up
+                animFrame: 0, // Animation frame (for walking)
+                animCounter: 0 // Controls animation speed
+            };
+            
+             // Initialize Light Source
+            light = { 
+                x: Math.floor(GAME_WIDTH / 2), // Start in center
+                y: Math.floor(GAME_HEIGHT / 2), 
+                size: 40, // Light radius
+                intensity: 1, // Light brightness
+                pathIndex: 0, // Tracks movement along path
+                path: [ // Predefined path for light movement
+                    {x: GAME_WIDTH/2, y: GAME_HEIGHT/2},
+                    {x: 60, y: 60},
+                    {x: 140, y: 60},
+                    {x: 220, y: 60},
+                    {x: 220, y: 140},
+                    {x: 140, y: 140},
+                    {x: 60, y: 140},
+                    {x: 60, y: 220},
+                    {x: 140, y: 220},
+                    {x: 220, y: 220}
+                ],
+                speed: 0.5 // Light movement speed
+            };
+            
+            // Reset Game Status
+            detected = false; // Whether the player is detected by light
+            gameOver = false; // Game over state
+            angle = 0; // Rotation angle for effects
+
+            // Reset Game Objects
+            walls = []; // Walls in the maze
+            pillars = []; // Obstacles
+            candles = []; // Candles to collect
+            floorTiles = []; // Floor decorations
+            stainedGlass = []; // Background decorations
+
+            createCathedralElements(); // Build walls, pillars, and decorations
+            candlesCollected = 0; // Reset collected candles count
+            generateCandles(5); // Generate 5 candles at the start
+        }
+
+        // Keyboard Input Handling
         document.addEventListener("keydown", (e) => {
-            keys[e.key] = true;
-            if (e.key === "r" || e.key === "R") resetGame(); // Restart game
+            keys[e.key] = true; // Mark key as pressed
+
+            // 🔄 Restart the game when "R" is pressed
+            if (e.key === "r" || e.key === "R") resetGame();
         });
 
+        // Stop movement when key is released
         document.addEventListener("keyup", (e) => keys[e.key] = false);
 
+        let candlesCollected = 0; // Number of collected candles
+        let highestScore = 0; // Number of collected candles
+
+        // Move Player Function
         function movePlayer() {
-            if (gameOver) return;
-            if (keys["ArrowUp"] && player.y - player.radius > 0) player.y -= speed;
-            if (keys["ArrowDown"] && player.y + player.radius < canvas.height) player.y += speed;
-            if (keys["ArrowLeft"] && player.x - player.radius > 0) player.x -= speed;
-            if (keys["ArrowRight"] && player.x + player.radius < canvas.width) player.x += speed;
+            if (gameOver) return;  // Stop movement if game is over
+
+            let newX = player.x; // New X position
+            let newY = player.y; // New Y position
+            let moved = false; // Track if movement occurs
+
+            if (keys["ArrowUp"]) {
+                newY -= speed;
+                moved = true;
+            }
+            if (keys["ArrowDown"]) {
+                newY += speed;
+                moved = true;
+            }
+            if (keys["ArrowLeft"]) {
+                newX -= speed;
+                moved = true;
+            }
+            if (keys["ArrowRight"]) {
+                newX += speed;
+                moved = true;
+            }
+
+            // Wall collision
+            let collision = false;
+            for (let i = 0; i < walls.length; i++) {
+                const wall = walls[i];
+
+                 //  If player collides with a wall, prevent movement
+                if (
+                    newX < wall.x + wall.width &&
+                    newX + player.size > wall.x &&
+                    newY < wall.y + wall.height &&
+                    newY + player.size > wall.y
+                ) {
+                    collision = true;
+                    break;  // If player collides with a wall, prevent movement
+                }
+            }
+
+            // Pillar collision
+            if (!collision) {
+                for (let i = 0; i < pillars.length; i++) {
+                    const pillar = pillars[i];
+                    // Prevent movement if colliding with a pillar
+                    if (
+                        newX < pillar.x + pillar.size &&
+                        newX + player.size > pillar.x &&
+                        newY < pillar.y + pillar.size &&
+                        newY + player.size > pillar.y
+                    ) {
+                        collision = true;
+                        break;
+                    }
+                }
+            }
+
+            // 🔥 Collect Candles
+            if (!collision) {
+                for (let i = candles.length - 1; i >= 0; i--) {
+                    const candle = candles[i];
+
+                    //  Check if player overlaps with a candle
+                    if (
+                        newX < candle.x + candle.size &&
+                        newX + player.size > candle.x &&
+                        newY < candle.y + candle.size &&
+                        newY + player.size > candle.y
+                    ) {
+                        candles.splice(i, 1); // Remove collected candle
+                        candlesCollected++; // Increase score
+                        highestScore = Math.max(highestScore, candlesCollected); // Update highest score
+
+                        // Generate new candles if all are collected
+                        if (candles.length === 0) {
+                            generateCandles(10); // Generate 5 new candles
+                        }
+                    }
+                }
+            }
+
+            // Move player if no collision
+            if (!collision) {
+                player.x = newX;
+                player.y = newY;
+            }
         }
+
+        // Generate Candles at Random Positions
+        function generateCandles(count) {
+            candles = []; // Clear existing candles
+            let attempts = 0; // Prevent infinite loops
+
+            while (candles.length < count && attempts < 200) { // Increased attempts
+                let x = Math.floor(Math.random() * (GAME_WIDTH / 20)) * 20;
+                let y = Math.floor(Math.random() * (GAME_HEIGHT / 20)) * 20;
+
+                let validPosition = true;  // Assume valid placement
+
+                // Check if the position is inside a wall
+                for (let i = 0; i < walls.length; i++) {
+                    const wall = walls[i];
+                    if (
+                        x < wall.x + wall.width &&
+                        x + 8 > wall.x &&
+                        y < wall.y + wall.height &&
+                        y + 8 > wall.y
+                    ) {
+                        validPosition = false; // Cannot place candle inside walls
+                        break;
+                    }
+                }
+
+                // Check if the position is inside a pillar
+                for (let i = 0; i < pillars.length; i++) {
+                    const pillar = pillars[i];
+                    if (
+                        x < pillar.x + pillar.size &&
+                        x + 8 > pillar.x &&
+                        y < pillar.y + pillar.size &&
+                        y + 8 > pillar.y
+                    ) {
+                        // Cannot place candle inside pillars
+                        validPosition = false;  
+                        break;
+                    }
+                }
+
+                // Only add the candle if position is valid
+                if (validPosition) {
+                    candles.push({ x, y, size: 4 }); // Ensure size is small
+                }
+
+                attempts++;
+            }
+        }       
+
 
         function moveLight() {
             if (gameOver) return;
+
+           // Calculate distance between light and player
             let dx = player.x - light.x;
             let dy = player.y - light.y;
             let distance = Math.sqrt(dx * dx + dy * dy);
-            detected = distance < light.size * 0.8;
 
-            stopLight = detected;
+            if (distance > 2) { // Prevent jittering when close
+                light.x += (dx / distance) * light.speed;  // Move light towards player
+                light.y += (dy / distance) * light.speed;
+            }
 
-            if (!stopLight) {
-                light.x = 300 + Math.cos(angle) * 150;
-                light.y = 200 + Math.sin(angle) * 150;
-                angle += lightSpeed * 0.01;
-            } else {
+            // Check if player is caught in light
+            let playerDx = player.x + player.size / 2 - light.x;
+            let playerDy = player.y + player.size / 2 - light.y;
+            let playerDistance = Math.sqrt(playerDx * playerDx + playerDy * playerDy);
+            detected = playerDistance < light.size * 0.7;
+
+            if (detected) {
                 gameOver = true; // End game when caught
+            }
+
+            // Light intensity variation (Keep this from Code 2)
+            light.intensity = 2 + Math.sin(frameCount * 0.1) * 0.1;
+        }
+
+        // Draw a Pixelated Rectangle
+        function drawPixelRect(x, y, width, height, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(Math.floor(x), Math.floor(y), width, height);
+        }
+
+        // Draw the Cathedral Background & Structures
+        function drawCathedral() {
+            // Draw background
+            drawPixelRect(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.background);
+            
+            // Draw floor tiles
+            for (let i = 0; i < floorTiles.length; i++) {
+                const tile = floorTiles[i];
+                drawPixelRect(tile.x, tile.y, tile.size, tile.size, 
+                    tile.type === 0 ? COLORS.floor : COLORS.floorPattern);
+            }
+            
+            // Draw stained glass window
+            for (let i = 0; i < stainedGlass.length; i++) {
+                const glass = stainedGlass[i];
+                drawPixelRect(glass.x, glass.y, glass.size, glass.size, glass.color);
+            }
+            
+            // Draw walls
+            for (let i = 0; i < walls.length; i++) {
+                const wall = walls[i];
+                drawPixelRect(wall.x, wall.y, wall.width, wall.height, COLORS.walls);
+                
+                // Wall pattern
+                if (wall.width > wall.height) {
+                    // Horizontal wall
+                    for (let x = wall.x + 5; x < wall.x + wall.width - 5; x += 10) {
+                        drawPixelRect(x, wall.y + 5, 5, wall.height - 10, COLORS.wallsHighlight);
+                    }
+                } else {
+                    // Vertical wall
+                    for (let y = wall.y + 5; y < wall.y + wall.height - 5; y += 10) {
+                        drawPixelRect(wall.x + 5, y, wall.width - 10, 5, COLORS.wallsHighlight);
+                    }
+                }
+            }
+            
+            // Draw pillars
+            for (let i = 0; i < pillars.length; i++) {
+                const pillar = pillars[i];
+                drawPixelRect(pillar.x, pillar.y, pillar.size, pillar.size, COLORS.walls);
+                // Pillar highlight
+                drawPixelRect(pillar.x + 3, pillar.y + 3, pillar.size - 6, pillar.size - 6, COLORS.wallsHighlight);
+            }
+        }
+
+        function drawCandles() {
+            for (let i = 0; i < candles.length; i++) {
+                const candle = candles[i];
+
+                // 🔴 Reduce candle base size
+                const baseWidth = 5;  // Previously `candle.size`, now smaller
+                const baseHeight = 10; // Previously `candle.size * 2`, now smaller
+                drawPixelRect(candle.x, candle.y, baseWidth, baseHeight, "#aa5533");
+
+                // 🔴 Reduce flickering effect
+                const flicker = Math.sin(frameCount * 0.2 + i) * 1; // Smaller flicker range
+                const flameSize = 4; // Smaller flame size
+
+                // 🔴 Reduce candle glow area
+                const candleIntensity = 0.3 + Math.sin(frameCount * 0.1 + i) * 0.1;
+                for (let y = candle.y - 3; y < candle.y + 6; y++) { // Glow range reduced
+                    for (let x = candle.x - 3; x < candle.x + baseWidth + 3; x++) { // Glow width reduced
+                        if (x >= 0 && x < GAME_WIDTH && y >= 0 && y < GAME_HEIGHT) {
+                            const dx = x - (candle.x + baseWidth / 2);
+                            const dy = y - candle.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+
+                            if (distance < 6) { // Reduce glow radius
+                                const opacity = (1 - distance / 6) * candleIntensity * 0.2;
+                                ctx.fillStyle = `rgba(255, 170, 85, ${opacity})`;
+                                ctx.fillRect(x, y, 1, 1);
+                            }
+                        }
+                    }
+                }
+
+                // 🔴 Reduce candle flame size
+                drawPixelRect(candle.x + baseWidth / 2 - 1, candle.y - flameSize + flicker, 2.5, flameSize, "#ffff77");
+            }
+        }
+
+        function drawLight() {
+            const lightX = Math.floor(light.x - light.size/2);
+            const lightY = Math.floor(light.y - light.size/2);
+            const lightSize = Math.floor(light.size);
+            
+            // Draw light source
+            drawPixelRect(light.x - 3, light.y - 3, 6, 6, COLORS.lightGlow);
+            
+            // Draw light area with pixel-perfect edges
+            for (let y = lightY; y < lightY + lightSize; y++) {
+                for (let x = lightX; x < lightX + lightSize; x++) {
+                    if (x >= 0 && x < GAME_WIDTH && y >= 0 && y < GAME_HEIGHT) {
+                        const dx = x - light.x;
+                        const dy = y - light.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < lightSize/2) {
+                            // Calculate opacity based on distance from center
+                            const opacity = (1 - (distance / (lightSize/2))) * light.intensity;
+                            ctx.fillStyle = `rgba(255, 170, 119, ${opacity * 0.5})`;
+                            ctx.fillRect(x, y, 1, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawPlayer() {
+            // Draw player shadow
+            drawPixelRect(player.x, player.y + player.size - 2, player.size, 2, COLORS.playerShadow);
+            
+            // Ghost body base
+            drawPixelRect(player.x + 1, player.y, player.size - 2, player.size, COLORS.player);
+            
+            // bottom
+            if (player.direction === 0) { // Down
+                drawPixelRect(player.x, player.y + player.size - 3, 1, 2, COLORS.player);
+                drawPixelRect(player.x + player.size - 1, player.y + player.size - 3, 1, 2, COLORS.player);
+            }
+            
+            // Ghost head shape
+            drawPixelRect(player.x + 2, player.y, player.size - 4, 2, COLORS.player);
+            
+            // Eyes based on direction
+            if (player.direction === 0) { // Down
+                // Wide, spooky eyes
+                drawPixelRect(player.x + 1, player.y + 2, 2, 1, "#FFFFFF");
+                drawPixelRect(player.x + player.size - 3, player.y + 2, 2, 1, "#FFFFFF");
+            } else if (player.direction === 1) { // Left
+                drawPixelRect(player.x + 1, player.y + 2, 2, 1, "#FFFFFF");
+            } else if (player.direction === 2) { // Right
+                drawPixelRect(player.x + player.size - 3, player.y + 2, 2, 1, "#FFFFFF");
+            } else if (player.direction === 3) { // Up
+                // Tiny, mysterious eyes
+                drawPixelRect(player.x + 2, player.y + 2, 1, 1, "#FFFFFF");
+                drawPixelRect(player.x + player.size - 3, player.y + 2, 1, 1, "#FFFFFF");
+            }
+            
+            // Subtle animation/movement
+            if (player.animFrame === 1) {
+                // Slight body wobble
+                if (player.direction === 0) { // Down
+                    drawPixelRect(player.x, player.y + player.size - 1, 1, 1, COLORS.player);
+                    drawPixelRect(player.x + player.size - 1, player.y + player.size - 1, 1, 1, COLORS.player);
+                } else if (player.direction === 1) { // Left
+                    drawPixelRect(player.x, player.y + player.size - 1, 1, 1, COLORS.player);
+                } else if (player.direction === 2) { // Right
+                    drawPixelRect(player.x + player.size - 1, player.y + player.size - 1, 1, 1, COLORS.player);
+                } else if (player.direction === 3) { // Up
+                    drawPixelRect(player.x, player.y + player.size - 1, 1, 1, COLORS.player);
+                    drawPixelRect(player.x + player.size - 1, player.y + player.size - 1, 1, 1, COLORS.player);
+                }
             }
         }
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw dark background
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw light effect on background
-            let backgroundGradient = ctx.createRadialGradient(light.x, light.y, 20, light.x, light.y, light.size);
-            backgroundGradient.addColorStop(0, "rgba(255, 255, 150, 0.5)");
-            backgroundGradient.addColorStop(1, "rgba(0, 0, 0, 1)");
-            ctx.fillStyle = backgroundGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw player as a circle
-            ctx.fillStyle = "white";
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-            ctx.fill();
-
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            // Draw cathedral background
+            drawCathedral();
+            
+            // Draw candles with light effect
+            drawCandles();
+            
             // Draw light effect
-            let lightGradient = ctx.createRadialGradient(light.x, light.y, 10, light.x, light.y, light.size);
-            lightGradient.addColorStop(0, "rgba(255, 255, 200, 0.8)");
-            lightGradient.addColorStop(1, "rgba(255, 255, 0, 0)");
-            ctx.fillStyle = lightGradient;
-            ctx.beginPath();
-            ctx.arc(light.x, light.y, light.size, 0, Math.PI * 2);
-            ctx.fill();
-
+            drawLight();
+            
+            // Draw player
+            drawPlayer();
+            drawUI(); // Show the score
+            
             // Draw detection effect
             if (detected) {
-                ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
+                ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
             }
-
+            
             // Show game over message
             if (gameOver) {
-                ctx.fillStyle = "red";
-                ctx.font = "30px Arial";
+                drawPixelRect(GAME_WIDTH/2 - 60, GAME_HEIGHT/2 - 20, 120, 40, COLORS.gameOverBg);
+                
+                ctx.fillStyle = COLORS.gameOverText;
+                ctx.font = "10px Courier New";
                 ctx.textAlign = "center";
-                ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2);
-                ctx.fillText("Press 'R' to Restart", canvas.width / 2, canvas.height / 2 + 40);
+                ctx.fillText("CAUGHT!", GAME_WIDTH/2, GAME_HEIGHT/2);
+                ctx.fillText("PRESS 'R' TO RESTART", GAME_WIDTH/2, GAME_HEIGHT/2 + 15);
             }
         }
 
+        // Main Game Loop
         function gameLoop() {
-            movePlayer();
-            moveLight();
-            draw();
+            frameCount++; // Keep track of the total frames (used for animations)
+
+            movePlayer(); // Move the player based on keyboard input
+            moveLight();  // Move the light towards the player
+            draw();       // Redraw the entire game screen
+
+            // Recursively call `gameLoop()` to keep the game running smoothly
             requestAnimationFrame(gameLoop);
         }
 
-        resetGame();
-        gameLoop();
+        // Initialize Game
+        resetGame(); // Set up player, light, and reset variables
+        createCathedralElements(); // Generate walls, pillars, and decorations
+        gameLoop(); // Start the game loop
     </script>
 </body>
 </html>
