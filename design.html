@@ -186,7 +186,7 @@
             light = { 
                 x: Math.floor(GAME_WIDTH / 2), 
                 y: Math.floor(GAME_HEIGHT / 2), 
-                size: 40,
+                size: 35,
                 intensity: 1,
                 pathIndex: 0,
                 path: [
@@ -515,13 +515,25 @@
             
             // Show game over message
             if (gameOver) {
-                drawPixelRect(GAME_WIDTH/2 - 60, GAME_HEIGHT/2 - 20, 120, 40, COLORS.gameOverBg);
-                
+                const paddingX = 5; // Padding for width
+                const paddingY = 2; // Reduced padding for height
+
+                // Adjust the rectangle dimensions to include padding
+                const rectWidth = 120 + paddingX * 2;
+                const rectHeight = 40 + paddingY * 2;
+                const rectX = GAME_WIDTH / 2 - rectWidth / 2;
+                const rectY = GAME_HEIGHT / 2 - rectHeight / 2;
+
+                drawPixelRect(rectX, rectY, rectWidth, rectHeight, COLORS.gameOverBg);
+
+                // Adjust text positions to fit within the rectangle
                 ctx.fillStyle = COLORS.gameOverText;
                 ctx.font = "10px Courier New";
                 ctx.textAlign = "center";
-                ctx.fillText("CAUGHT!", GAME_WIDTH/2, GAME_HEIGHT/2);
-                ctx.fillText("PRESS 'R' TO RESTART", GAME_WIDTH/2, GAME_HEIGHT/2 + 15);
+
+                const textY = GAME_HEIGHT / 2 - rectHeight / 4; // Adjusted text position for reduced top padding
+                ctx.fillText("CAUGHT!", GAME_WIDTH / 2, textY + 6);
+                ctx.fillText("PRESS 'R' TO RESTART", GAME_WIDTH / 2, textY + 24 );
             }
         }
 
