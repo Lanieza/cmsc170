@@ -60,6 +60,15 @@
             [1, 1, 1, 1, 1, 1, 1]
         ];
 
+        const candleImage = new Image();
+        candleImage.src = "assets/candle.png"; // Replace with the actual path to the candle image
+
+        const playerImage = new Image();
+        playerImage.src = "assets/player.png"; // Replace with the actual path to the player image
+
+        const lightImage = new Image();
+        lightImage.src = "assets/light.png"; // Replace with the actual path to the light image
+
         let player, enemy, apple, applesCollected, highScore, gameInterval;
 
         function resetGame() {
@@ -87,27 +96,57 @@
         function drawMaze() {
             for (let row = 0; row < ROWS; row++) {
                 for (let col = 0; col < COLS; col++) {
-                    ctx.fillStyle = maze[row][col] === 1 ? "black" : "white";
+                    ctx.fillStyle = maze[row][col] === 1 ? "#420915" : "#690e21";
                     ctx.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
                 }
             }
         }
 
         function drawPlayer() {
-            ctx.fillStyle = "blue";
-            ctx.fillRect(player.x * GRID_SIZE + 5, player.y * GRID_SIZE + 5, GRID_SIZE - 10, GRID_SIZE - 10);
+            const scale = 3; // Adjust scaling factor as needed
+            ctx.drawImage(
+                playerImage,
+                player.x * GRID_SIZE + (GRID_SIZE - GRID_SIZE * scale) / 2, // Center the sprite
+                player.y * GRID_SIZE + (GRID_SIZE - GRID_SIZE * scale) / 2, // Center the sprite
+                GRID_SIZE * scale,
+                GRID_SIZE * scale
+            );
         }
 
         function drawEnemy() {
-            ctx.fillStyle = "red";
-            ctx.fillRect(enemy.x * GRID_SIZE + 5, enemy.y * GRID_SIZE + 5, GRID_SIZE - 10, GRID_SIZE - 10);
+            const scale = 3.5; // Adjust scaling factor as needed
+
+            // Calculate pulsating glow intensity using a sine wave
+            const time = Date.now() / 500; // Adjust the divisor to control pulsation speed
+            const glowIntensity = Math.abs(Math.sin(time)) * 40 + 10; // Glow intensity oscillates between 10 and 30
+
+            // Set shadow properties for the glow
+            ctx.shadowBlur = glowIntensity;
+            ctx.shadowColor = "rgba(255, 255, 0, 0.8)"; // Yellowish glow
+
+            // Draw the enemy sprite
+            ctx.drawImage(
+                lightImage,
+                enemy.x * GRID_SIZE + (GRID_SIZE - GRID_SIZE * scale) / 2, // Center the sprite
+                enemy.y * GRID_SIZE + (GRID_SIZE - GRID_SIZE * scale) / 2, // Center the sprite
+                GRID_SIZE * scale,
+                GRID_SIZE * scale
+            );
+
+            // Reset shadow properties to avoid affecting other drawings
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = "transparent";
         }
 
         function drawApple() {
-            ctx.fillStyle = "green";
-            ctx.beginPath();
-            ctx.arc(apple.x * GRID_SIZE + GRID_SIZE / 2, apple.y * GRID_SIZE + GRID_SIZE / 2, GRID_SIZE / 4, 0, Math.PI * 2);
-            ctx.fill();
+            const scale = 2; // Adjust scaling factor as needed
+            ctx.drawImage(
+                candleImage,
+                apple.x * GRID_SIZE + (GRID_SIZE - GRID_SIZE * scale) / 2, // Center the sprite
+                apple.y * GRID_SIZE + (GRID_SIZE - GRID_SIZE * scale) / 2, // Center the sprite
+                GRID_SIZE * scale,
+                GRID_SIZE * scale
+            );
         }
 
         function updateGame() {
@@ -183,10 +222,13 @@
         function movePlayer(event) {
             let newX = player.x;
             let newY = player.y;
-            if (event.key === "ArrowUp") newY--;
-            if (event.key === "ArrowDown") newY++;
-            if (event.key === "ArrowLeft") newX--;
-            if (event.key === "ArrowRight") newX++;
+
+            // Handle arrow keys and WASD keys
+            if (event.key === "ArrowUp" || event.key === "w") newY--;
+            if (event.key === "ArrowDown" || event.key === "s") newY++;
+            if (event.key === "ArrowLeft" || event.key === "a") newX--;
+            if (event.key === "ArrowRight" || event.key === "d") newX++;
+
             if (maze[newY] && maze[newY][newX] === 0) {
                 player.x = newX;
                 player.y = newY;
