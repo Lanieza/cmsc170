@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Maze Game</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; position: relative; }
+        canvas { border: 2px solid black; }
+        #gameOver {
+            display: none;
+            font-size: 24px;
+            color: red;
+            font-weight: bold;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #resetButton {
+            display: none;
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #score {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Grid Maze Game</h1>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver">GAME OVER</div>
+    <button id="resetButton">Play Again</button>
+    <div id="score">Apples Collected: <span id="appleCount">0</span> | High Score: <span id="highScore">0</span></div>
+
+    <script>
+        const GRID_SIZE = 50;
+        const COLS = 7;
+        const ROWS = 7;
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const gameOverText = document.getElementById("gameOver");
+        const resetButton = document.getElementById("resetButton");
+        const appleCountElement = document.getElementById("appleCount");
+        const highScoreElement = document.getElementById("highScore");
+        canvas.width = COLS * GRID_SIZE;
+        canvas.height = ROWS * GRID_SIZE;
+
+        const maze = [
+            [1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1]
+        ];
+
+        let player, enemy, apple, applesCollected, highScore, gameInterval;
+
+        function resetGame() {
+            player = { x: 1, y: 1 };
+            enemy = { x: 5, y: 5 };
+            applesCollected = 0;
+            apple = generateApple();
+            gameOverText.style.display = "none";
+            resetButton.style.display = "none";
+            document.addEventListener("keydown", movePlayer);
+            clearInterval(gameInterval);
+            gameInterval = setInterval(moveEnemyWithBFS, 200); // Reduce time interval for faster enemy movement
+            updateGame();
+        }
+
+        function generateApple() {
+            let appleX, appleY;
+            do {
+                appleX = Math.floor(Math.random() * COLS);
+                appleY = Math.floor(Math.random() * ROWS);
+            } while (maze[appleY][appleX] === 1 || (appleX === player.x && appleY === player.y)); // Ensure it's not in a wall or on top of the player
+            return { x: appleX, y: appleY };
+        }
+
+        function drawMaze() {
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    ctx.fillStyle = maze[row][col] === 1 ? "black" : "white";
+                    ctx.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                }
+            }
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = "blue";
+            ctx.fillRect(player.x * GRID_SIZE + 5, player.y * GRID_SIZE + 5, GRID_SIZE - 10, GRID_SIZE - 10);
+        }
+
+        function drawEnemy() {
+            ctx.fillStyle = "red";
+            ctx.fillRect(enemy.x * GRID_SIZE + 5, enemy.y * GRID_SIZE + 5, GRID_SIZE - 10, GRID_SIZE - 10);
+        }
+
+        function drawApple() {
+            ctx.fillStyle = "green";
+            ctx.beginPath();
+            ctx.arc(apple.x * GRID_SIZE + GRID_SIZE / 2, apple.y * GRID_SIZE + GRID_SIZE / 2, GRID_SIZE / 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMaze();
+            drawPlayer();
+            drawEnemy();
+            drawApple();
+            checkGameOver();
+            appleCountElement.textContent = applesCollected;
+            if (applesCollected > highScore) {
+                highScore = applesCollected;
+                highScoreElement.textContent = highScore;
+            }
+        }
+
+        function bfs(enemy, player, maze) {
+            const directions = [
+                { dx: 0, dy: -1 }, // up
+                { dx: 0, dy: 1 },  // down
+                { dx: -1, dy: 0 }, // left
+                { dx: 1, dy: 0 }   // right
+            ];
+
+            const queue = [{ x: enemy.x, y: enemy.y, path: [] }];
+            const visited = new Set();
+
+            visited.add(`${enemy.x},${enemy.y}`);
+
+            while (queue.length > 0) {
+                const { x, y, path } = queue.shift();
+
+                // If we reached the player, return the path
+                if (x === player.x && y === player.y) {
+                    return path;
+                }
+
+                // Explore all possible directions
+                for (let { dx, dy } of directions) {
+                    let newX = x + dx;
+                    let newY = y + dy;
+
+                    if (maze[newY] && maze[newY][newX] === 0 && !visited.has(`${newX},${newY}`)) {
+                        visited.add(`${newX},${newY}`);
+                        queue.push({ x: newX, y: newY, path: [...path, { dx, dy }] });
+                    }
+                }
+            }
+            return null; // No path found
+        }
+
+        function moveEnemyWithBFS() {
+            const path = bfs(enemy, player, maze);
+            
+            if (path && path.length > 0) {
+                const { dx, dy } = path[0];
+                enemy.x += dx;
+                enemy.y += dy;
+            }
+            updateGame();
+        }
+
+
+        function checkGameOver() {
+            if (player.x === enemy.x && player.y === enemy.y) {
+                gameOverText.style.display = "block";
+                resetButton.style.display = "block";
+                document.removeEventListener("keydown", movePlayer);
+                clearInterval(gameInterval);
+            }
+        }
+
+        function movePlayer(event) {
+            let newX = player.x;
+            let newY = player.y;
+            if (event.key === "ArrowUp") newY--;
+            if (event.key === "ArrowDown") newY++;
+            if (event.key === "ArrowLeft") newX--;
+            if (event.key === "ArrowRight") newX++;
+            if (maze[newY] && maze[newY][newX] === 0) {
+                player.x = newX;
+                player.y = newY;
+
+                // Check if player collects the apple
+                if (player.x === apple.x && player.y === apple.y) {
+                    applesCollected++;
+                    apple = generateApple(); // Generate a new apple
+                }
+            }
+            updateGame();
+        }
+
+        resetButton.addEventListener("click", resetGame);
+        resetGame();
+    </script>
+</body>
+</html>
